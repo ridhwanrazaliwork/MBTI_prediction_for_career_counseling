@@ -9,6 +9,9 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from joblib import load
 import nltk
 import pypdf
+from mbti_descriptions import mbti_descriptions #Import description
+from collections import Counter
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 # Page config
 st.set_page_config(layout="wide", page_title="MBTI Predictor")
@@ -52,6 +55,24 @@ st.markdown(
             font-weight: bold;
 
         }
+        .mbti-section {
+             background-color: #f0f0f0;
+            border-radius: 5px;
+             padding: 10px;
+            margin-top: 10px;
+        }
+        .mbti-header {
+             background-color: #e0e0e0;
+             border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .careers-box {
+             background-color: #f8f8f8;
+             border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+        }
     </style>
     """,
     unsafe_allow_html=True,
@@ -61,6 +82,8 @@ st.markdown(
 nltk.download('wordnet')
 nltk.download('omw-1.4')
 nltk.download('stopwords')
+nltk.download('vader_lexicon')
+
 
 # Load the saved models
 model_ie = load('logistic_regression_IE.pkl')
@@ -131,6 +154,69 @@ def predict_mbti(text):
     mbti_type += b_Pers_list[3][pred_jp]
     
     return mbti_type
+
+def get_mbti_description(mbti_type, workplace_values, interests_skills):
+    """Retrieves the description for a given MBTI type."""
+    base_data = mbti_descriptions.get(mbti_type, {
+        "overview": "No description available.",
+        "strengths": "No strengths information.",
+        "weaknesses": "No weakness information.",
+        "work_style": "No work style information.",
+        "communication_style": "No communication style information.",
+         "careers": {
+          "default":["No career information available"]
+         }
+    })
+    if "careers" in base_data:
+       
+       career_key= "default"
+       for key in base_data["careers"].keys():
+            if key != "default" and (key in workplace_values or key in interests_skills):
+                 career_key= key
+                 break
+       
+       return {
+            "overview": base_data["overview"],
+            "strengths": base_data["strengths"],
+            "weaknesses": base_data["weaknesses"],
+            "work_style": base_data["work_style"],
+            "communication_style": base_data["communication_style"],
+            "careers": base_data["careers"][career_key]
+           }
+    else:
+        return base_data
+
+def analyze_text_input(text, workplace_values, team_role, interests_skills, scenario1_reflection, scenario2_reflection):
+    """Analyzes the user's text input and returns relevant insights."""
+
+    all_text = f"{text} {' '.join(workplace_values)} {team_role} {' '.join(interests_skills)} {scenario1_reflection} {scenario2_reflection}"
+    processed_text=preprocess_text(all_text)
+    word_counts = Counter(processed_text.split())
+    
+    # Extract some keywords
+    keywords = ["innovative", "structured", "leading", "teamwork", "technology", "strategic","creative", "analytical", "helping", "communication", "organized"]
+    keyword_counts = {keyword: word_counts[keyword] for keyword in keywords if keyword in word_counts}
+
+    skill_counts = {skill: word_counts[skill.lower()] for skill in interests_skills if skill.lower() in word_counts}
+    team_role_str=f"Prefers {team_role}"
+    
+    #Sentiment Analysis
+    analyzer = SentimentIntensityAnalyzer()
+    sentiment_scores = analyzer.polarity_scores(processed_text)
+    
+    if sentiment_scores["compound"] >= 0.05:
+        sentiment = "Positive"
+    elif sentiment_scores["compound"] <= -0.05:
+      sentiment = "Negative"
+    else:
+      sentiment = "Neutral"
+    
+    return {
+        "keyword_counts": keyword_counts,
+        "skill_counts": skill_counts,
+        "team_role":team_role_str,
+        "sentiment": sentiment
+    }
 
 # Streamlit app
 def main():
@@ -209,10 +295,36 @@ def main():
                      text_input = uploaded_file.read().decode("utf-8")
             except Exception as e:
                  st.error(f"An error occurred: {e}")
+
+    st.sidebar.header("Additional Insights")
     if st.button("Predict MBTI"):
             combined_text=f"{text_input} {' '.join(workplace_values)} {team_role} {' '.join(interests_skills)} {scenario1_reflection} {scenario2_reflection}"
             predicted_mbti = predict_mbti(combined_text)
-            st.success(f"Predicted MBTI type: {predicted_mbti}")
+            st.markdown(f'<div class="mbti-header"> <b>Predicted MBTI Type:</b></div>', unsafe_allow_html=True)
+            st.title(f"{predicted_mbti}")
+            
+            description = get_mbti_description(predicted_mbti, workplace_values, interests_skills)
+            st.markdown(f'<div class="mbti-section"> <b>MBTI Type Insights:</b></div>', unsafe_allow_html=True)
+            st.markdown(f"**Overview:** {description['overview']}")
+            st.markdown(f"**Strengths:** {description['strengths']}")
+            st.markdown(f"**Potential Weaknesses:** {description['weaknesses']}")
+            st.markdown(f"**Preferred Work Style:** {description['work_style']}")
+            st.markdown(f"**Communication Style:** {description['communication_style']}")
+
+            st.markdown(f'<div class="careers-box"> <b>Career Recommendations:</b></div>', unsafe_allow_html=True)
+            for career in description['careers']:
+                st.markdown(f"- {career}")
+            text_analysis_result = analyze_text_input(text_input, workplace_values, team_role, interests_skills, scenario1_reflection, scenario2_reflection)
+
+            st.sidebar.markdown("**Keywords Mentioned:**")
+            for keyword, count in text_analysis_result["keyword_counts"].items():
+               st.sidebar.markdown(f"- {keyword}: {count}")
+            st.sidebar.markdown("**Skills Selected:**")
+            for skill, count in text_analysis_result["skill_counts"].items():
+               st.sidebar.markdown(f"- {skill}: {count}")
+            st.sidebar.markdown(f"**Team Preference**")
+            st.sidebar.markdown(f"- {text_analysis_result['team_role']}")
+            st.sidebar.markdown(f"**Overall Sentiment:** {text_analysis_result['sentiment']}")
 
 if __name__ == "__main__":
     main()

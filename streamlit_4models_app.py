@@ -240,7 +240,7 @@ def main():
       st.session_state.dummy_workplace_values = ["Innovation", "Structure"]
       st.session_state.dummy_team_role = "Take a leading role"
       st.session_state.dummy_interests_skills = ["Technology", "Strategic Planning"]
-      st.session_state.dummy_scenario1_reflection = "I would try to create a clear plan and then delegate tasks to team members, while keeping the vision in mind."
+      st.session_state.dummy_scenario1_reflection = "I would start by listing out all the potential benefits and drawbacks. Then, I would think about how this choice aligns with my long-term goals. I would also talk to a few close friends or family members to get their perspectives before making my final decision. Cost and logistics are something I will need to consider also."
       st.session_state.dummy_scenario2_reflection = "I would gather more evidence, and see if I can run small scale test cases to prove the efficiency of this new approach."
 
     if st.button("Populate Dummy Input"):

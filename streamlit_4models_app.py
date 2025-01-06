@@ -276,7 +276,7 @@ def main():
     with st.expander("Scenario Reflections"):
       st.subheader("Scenario 1")
       scenario1 = st.text_input(
-           "You are assigned to lead a project with a tight deadline and conflicting team opinions. What would be your action and approach?",
+           "Imagine you are considering a significant personal choice, such as pursuing a new hobby or course or moving to a new location. How do you weigh the pros and cons, and what factors influence your decision?",
            disabled=True, key = "scenario1")
       scenario1_reflection = st.text_area(
           "Your reflection:",

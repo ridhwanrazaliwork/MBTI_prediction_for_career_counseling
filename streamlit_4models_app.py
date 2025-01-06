@@ -9,9 +9,10 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from joblib import load
 import nltk
 import pypdf
-from mbti_descriptions import mbti_descriptions #Import description
+from mbti_descriptions import mbti_descriptions, malaysia_profile #Import description
 from collections import Counter
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import matplotlib.pyplot as plt
 
 # Page config
 st.set_page_config(layout="wide", page_title="MBTI Predictor")
@@ -156,35 +157,46 @@ def predict_mbti(text):
     return mbti_type
 
 def get_mbti_description(mbti_type, workplace_values, interests_skills):
-    """Retrieves the description for a given MBTI type."""
+    """
+    Retrieves the description for a given MBTI type and adapts the careers
+    section based on workplace values and interests/skills.
+    """
+    # Fetch the base description for the MBTI type
     base_data = mbti_descriptions.get(mbti_type, {
         "overview": "No description available.",
         "strengths": "No strengths information.",
         "weaknesses": "No weakness information.",
         "work_style": "No work style information.",
         "communication_style": "No communication style information.",
-         "careers": {
-          "default":["No career information available"]
-         }
+        "careers": {
+            "default": ["No career information available"]
+        }
     })
+
+    # Check if careers are available in the data
     if "careers" in base_data:
-       
-       career_key= "default"
-       for key in base_data["careers"].keys():
+        # Default career key
+        career_key = "default"
+        # Find a specific career key matching workplace_values or interests_skills
+        for key in base_data["careers"].keys():
             if key != "default" and (key in workplace_values or key in interests_skills):
-                 career_key= key
-                 break
-       
-       return {
+                career_key = key
+                break
+
+        # Return the description with the appropriate career key
+        return {
             "overview": base_data["overview"],
             "strengths": base_data["strengths"],
             "weaknesses": base_data["weaknesses"],
             "work_style": base_data["work_style"],
             "communication_style": base_data["communication_style"],
-            "careers": base_data["careers"][career_key]
-           }
-    else:
-        return base_data
+            "careers": base_data["careers"][career_key],
+            "career_details": base_data.get("career_details", {})
+        }
+
+    # If no "careers" field, return the base data
+    return base_data
+
 
 def analyze_text_input(text, workplace_values, team_role, interests_skills, scenario1_reflection, scenario2_reflection):
     """Analyzes the user's text input and returns relevant insights."""
@@ -314,6 +326,11 @@ def main():
             st.markdown(f'<div class="careers-box"> <b>Career Recommendations:</b></div>', unsafe_allow_html=True)
             for career in description['careers']:
                 st.markdown(f"- {career}")
+            if "career_details" in description:
+              st.markdown(f'<div class="careers-box"> <b>Career Details:</b></div>', unsafe_allow_html=True)
+              for career in description['careers']:
+                 if career in description['career_details']:
+                    st.markdown(f"**{career}**: Tasks: {description['career_details'][career]['tasks']}. Skills:{', '.join(description['career_details'][career]['skills'])}. Salary Range: {description['career_details'][career]['salary_range']}")
             text_analysis_result = analyze_text_input(text_input, workplace_values, team_role, interests_skills, scenario1_reflection, scenario2_reflection)
 
             st.sidebar.markdown("**Keywords Mentioned:**")
@@ -325,6 +342,81 @@ def main():
             st.sidebar.markdown(f"**Team Preference**")
             st.sidebar.markdown(f"- {text_analysis_result['team_role']}")
             st.sidebar.markdown(f"**Overall Sentiment:** {text_analysis_result['sentiment']}")
+    
+    with st.sidebar.expander("Information"):
+        info_tab, training_data_tab = st.tabs(["About", "Training Data"])
+        with info_tab:
+            st.markdown(f"People from Malaysia are likely to be slightly more **Introverted** than Extraverted (+1.17%), slightly more **Intuitive** than Observant (+0.71%), significantly more **Feeling** than Thinking (+18.52%), slightly more **Prospecting** than Judging (+4.30%), and significantly more **Turbulent** than Assertive (+11.74%).")
+            st.markdown("Top MBTI types in Malaysia:")
+            for i, type in enumerate(malaysia_profile["top_mbti_types"][:10]):
+                st.markdown(f"{i+1}. {type}")
+            st.markdown(
+                """
+                **About MBTI:**
+                The Myers-Briggs Type Indicator (MBTI) is a self-report questionnaire designed to indicate different psychological preferences in how people perceive the world and make decisions.
+
+                **How to Use This Tool:**
+                This tool helps you explore your potential MBTI personality type by analyzing your written responses.
+
+                1. Start by describing your personality.
+                2. Select your workplace values and skills.
+                3. Reflect on the scenarios presented.
+                4. Click `Predict MBTI` to get results.
+
+                **Limitations:**
+                The accuracy of the MBTI result and career recommendations depends on the quality and amount of the information that you provide. These results should be used as a guide only, and not as a final solution. If you are unsure on any result, please reach out to career counselors.
+
+                **Data Privacy:**
+                 This app does not collect any of your input data. All the processing happens locally, and nothing is saved on the server.
+
+                 **Contact Information:**
+                 If you have any questions, please reach out to: contact@email.com
+                """
+            )
+        with training_data_tab:
+           mbti_df= pd.read_csv("mbti_1.csv")
+           mbti_counts= mbti_df['type'].value_counts()
+           fig, ax = plt.subplots(1,3,figsize=(12,4))
+           ax[0].bar(mbti_counts.index, mbti_counts.values)
+           ax[0].set_xlabel('MBTI Type')
+           ax[0].set_ylabel('Number of Posts')
+           ax[0].set_title('Distribution of MBTI Types in Training Dataset')
+           for tick in ax[0].get_xticklabels():
+            tick.set_rotation(45)
+            tick.set_ha('right') # Rotate x-axis labels to avoid overlap
+
+           roles = list(malaysia_profile["roles"].keys())
+           role_counts = list(malaysia_profile["roles"].values())
+           ax[1].bar(roles, role_counts)
+           ax[1].set_xlabel("Roles")
+           ax[1].set_ylabel("Percentage")
+           ax[1].set_title("Roles Distribution in Malaysia")
+            
+           strategies = list(malaysia_profile["strategies"].keys())
+           strategy_counts = list(malaysia_profile["strategies"].values())
+           ax[2].bar(strategies, strategy_counts)
+           ax[2].set_xlabel("Strategies")
+           ax[2].set_ylabel("Percentage")
+           ax[2].set_title("Strategies Distribution in Malaysia")
+           for tick in ax[2].get_xticklabels():
+            tick.set_rotation(45)
+            tick.set_ha('right') # Rotate x-axis labels to avoid overlap
+            
+           plt.tight_layout()
+           st.pyplot(fig)
+
+           st.markdown("**Trait Comparisons (Malaysia vs World):**")
+           traits = malaysia_profile["trait_comparisons"]["traits"]
+           malaysia_values=malaysia_profile["trait_comparisons"]["malaysia_values"]
+           world_values = malaysia_profile["trait_comparisons"]["world_values"]
+            
+           comparison_df = pd.DataFrame(
+            {
+               'Trait': traits,
+               'Malaysia': malaysia_values,
+               'World': world_values
+           })
+           st.dataframe(comparison_df)
 
 if __name__ == "__main__":
     main()
